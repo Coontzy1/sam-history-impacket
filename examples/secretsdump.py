@@ -58,14 +58,18 @@ import logging
 import os
 import sys
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from impacket import version
 from impacket.examples import logger
 from impacket.examples.utils import parse_target
 from impacket.smbconnection import SMBConnection
 from impacket.ldap.ldap import LDAPConnection, LDAPSessionError
 
+from impacket.examples import secretsdump as secretsdump_mod
 from impacket.examples.secretsdump import LocalOperations, RemoteOperations, SAMHashes, LSASecrets, NTDSHashes, \
     KeyListSecrets
+logging.debug('Using impacket.examples.secretsdump from %s', secretsdump_mod.__file__)
 from impacket.krb5.keytab import Keytab
 try:
     input = raw_input

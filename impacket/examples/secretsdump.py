@@ -1855,6 +1855,12 @@ class SAMHashes(OfflineRegistry):
                     history = self.__extract_local_history(rid, newStyle, userAccount)
                     lm_hist = history.get('lm', [])
                     nt_hist = history.get('nt', [])
+                    while lm_hist and nt_hist and lm_hist[-1] == nt_hist[-1]:
+                        lm_hist.pop()
+                        nt_hist.pop()
+                    LOG.debug('History lengths for %s (RID %d): lm=%d nt=%d', userName, rid,
+                              max(len(lm_hist) - 1, 0), max(len(nt_hist) - 1, 0))
+
                     count = max(len(lm_hist), len(nt_hist))
                     for idx in range(count):
                         lm_val = lm_hist[idx] if idx < len(lm_hist) else b''
