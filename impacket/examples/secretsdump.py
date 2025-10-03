@@ -1860,7 +1860,6 @@ class SAMHashes(OfflineRegistry):
                         nt_hist.pop()
                     LOG.debug('History lengths for %s (RID %d): lm=%d nt=%d', userName, rid,
                               max(len(lm_hist) - 1, 0), max(len(nt_hist) - 1, 0))
-
                     count = max(len(lm_hist), len(nt_hist))
                     for idx in range(count):
                         lm_val = lm_hist[idx] if idx < len(lm_hist) else b''
