@@ -64,10 +64,6 @@ from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from struct import unpack, pack
 from six import b, PY2
-try:
-    from itertools import zip_longest
-except ImportError:  # pragma: no cover - Python 2 fallback
-    from itertools import izip_longest as zip_longest
 
 from impacket import LOG
 from impacket import system_errors
@@ -1424,8 +1420,7 @@ class OfflineRegistry:
             self.__registryHive.close()
 
 class SAMHashes(OfflineRegistry):
-    def __init__(self, samFile, bootKey, isRemote=False, history=False, printUserStatus=False,
-                 perSecretCallback=lambda secret: _print_helper(secret)):
+    def __init__(self, samFile, bootKey, isRemote=False, history=False, printUserStatus=False, perSecretCallback=lambda secret: _print_helper(secret)):
         OfflineRegistry.__init__(self, samFile, isRemote)
         self.__samFile = samFile
         self.__hashedBootKey = b''
@@ -1652,42 +1647,29 @@ class SAMHashes(OfflineRegistry):
         nt_offset = int.from_bytes(meta[12:16], 'little', signed=False)
         nt_length = int.from_bytes(meta[16:20], 'little', signed=False)
 
-        if new_style:
-            lm_entries = self.__decode_aes_history_block(rid_int, data, lm_offset, lm_length)
-            nt_entries = self.__decode_aes_history_block(rid_int, data, nt_offset, nt_length)
+        if not new_style:
+            LOG.debug('Skipping old-style history for RID %d; RC4/DES path disabled', rid_int)
+            return result
 
-            if not lm_entries and lm_length:
-                blob = data[lm_offset:lm_offset + lm_length]
-                lm_entries = self.__decrypt_history_entries_aes(rid_int, self.__scan_v_for_aes_entries(blob))
-            if not nt_entries and nt_length:
-                blob = data[nt_offset:nt_offset + nt_length]
-                nt_entries = self.__decrypt_history_entries_aes(rid_int, self.__scan_v_for_aes_entries(blob))
+        lm_entries = self.__decode_aes_history_block(rid_int, data, lm_offset, lm_length)
+        nt_entries = self.__decode_aes_history_block(rid_int, data, nt_offset, nt_length)
 
-            # Windows stores NT history in the first slot and LM history in the second
-            # when AES ("new style") protection is used, so swap before returning.
-            result['lm'] = nt_entries
-            result['nt'] = lm_entries
+        if not lm_entries and lm_length:
+            blob = data[lm_offset:lm_offset + lm_length]
+            lm_entries = self.__decrypt_history_entries_aes(rid_int, self.__scan_v_for_aes_entries(blob))
+        if not nt_entries and nt_length:
+            blob = data[nt_offset:nt_offset + nt_length]
+            nt_entries = self.__decrypt_history_entries_aes(rid_int, self.__scan_v_for_aes_entries(blob))
 
-            if not result['lm'] and not result['nt'] and lm_length == 0 and nt_length == 0:
-                fallback_entries = self.__scan_v_for_aes_entries(data)
-                if fallback_entries:
-                    result['nt'] = self.__decrypt_history_entries_aes(rid_int, fallback_entries)
-        else:
-            if lm_length:
-                blob = data[lm_offset:lm_offset + lm_length]
-                result['lm'] = self.__decrypt_history_blob_rc4(rid_int, blob, lm_const)
-            if nt_length:
-                blob = data[nt_offset:nt_offset + nt_length]
-                result['nt'] = self.__decrypt_history_blob_rc4(rid_int, blob, nt_const)
+        # Windows stores NT history in the first slot and LM history in the second when
+        # AES ("new style") protection is used, so swap before returning.
+        result['lm'] = nt_entries
+        result['nt'] = lm_entries
 
-            if not result['lm'] and not result['nt']:
-                tail = data[0x100:] if len(data) > 0x100 else data
-                lm_hist = self.__decrypt_history_blob_rc4(rid_int, tail, lm_const)
-                nt_hist = self.__decrypt_history_blob_rc4(rid_int, tail, nt_const)
-                if len(nt_hist) >= len(lm_hist):
-                    result['nt'] = nt_hist
-                else:
-                    result['lm'] = lm_hist
+        if not result['lm'] and not result['nt'] and lm_length == 0 and nt_length == 0:
+            fallback_entries = self.__scan_v_for_aes_entries(data)
+            if fallback_entries:
+                result['nt'] = self.__decrypt_history_entries_aes(rid_int, fallback_entries)
 
         return result
     
