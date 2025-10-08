@@ -1577,19 +1577,6 @@ class SAMHashes(OfflineRegistry):
                 offset += (4 - (offset % 4))
         return entries
 
-    def __decrypt_history_blob_rc4(self, rid_int, blob, constant):
-        if not blob:
-            return []
-        key = self.MD5(self.__hashedBootKey[:0x10] + pack('<L', rid_int) + constant)
-        plain = ARC4.new(key).encrypt(blob)
-        out = []
-        for off in range(0, len(plain), 16):
-            block = plain[off:off + 16]
-            if len(block) < 16:
-                break
-            out.append(self.__unwrap_history_block(rid_int, block))
-        return out
-
     def __decode_aes_history_block(self, rid_int, data, offset, length):
         if offset <= 0 or length <= 0:
             return []
@@ -1617,22 +1604,6 @@ class SAMHashes(OfflineRegistry):
 
         enc = enc[:enc_len]
         return self.__decrypt_history_entries_aes(rid_int, [(record['Salt'], enc)])
-
-    def __find_named_blob(self, vdata, label):
-        needle = (label + '\x00').encode('utf-16le')
-        idx = vdata.find(needle)
-        if idx == -1:
-            return None
-        base = idx + len(needle)
-        for skip in (0, 2, 4, 6, 8):
-            length_off = base + skip
-            if length_off + 4 > len(vdata):
-                break
-            blob_len = int.from_bytes(vdata[length_off:length_off + 4], 'little', signed=False)
-            data_off = length_off + 4
-            if blob_len and data_off + blob_len <= len(vdata):
-                return vdata[data_off:data_off + blob_len]
-        return None
 
     def __extract_local_history(self, rid_int, new_style, user_account):
         lm_const = b"LMPASSWORDHISTORY\0"
@@ -1837,11 +1808,14 @@ class SAMHashes(OfflineRegistry):
                     history = self.__extract_local_history(rid, newStyle, userAccount)
                     lm_hist = history.get('lm', [])
                     nt_hist = history.get('nt', [])
+                    if ((lm_hist and lm_hist[0] == lmHash) or not lm_hist) and nt_hist and nt_hist[0] == ntHash:
+                        lm_hist = lm_hist[1:] if lm_hist else lm_hist
+                        nt_hist = nt_hist[1:]
                     while lm_hist and nt_hist and lm_hist[-1] == nt_hist[-1]:
                         lm_hist.pop()
                         nt_hist.pop()
                     LOG.debug('History lengths for %s (RID %d): lm=%d nt=%d', userName, rid,
-                              max(len(lm_hist) - 1, 0), max(len(nt_hist) - 1, 0))
+                              len(lm_hist), len(nt_hist))
                     count = max(len(lm_hist), len(nt_hist))
                     for idx in range(count):
                         lm_val = lm_hist[idx] if idx < len(lm_hist) else b''
