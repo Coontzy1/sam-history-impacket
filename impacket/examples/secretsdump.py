@@ -1808,10 +1808,6 @@ class SAMHashes(OfflineRegistry):
                     history = self.__extract_local_history(rid, newStyle, userAccount)
                     lm_hist = history.get('lm', [])
                     nt_hist = history.get('nt', [])
-                    if lm_hist:
-                        lm_hist = lm_hist[1:]
-                    if nt_hist:
-                        nt_hist = nt_hist[1:]
                     while lm_hist and nt_hist and lm_hist[-1] == nt_hist[-1]:
                         lm_hist.pop()
                         nt_hist.pop()
